@@ -18,6 +18,7 @@ import {
   Volume2
 } from "lucide-react"
 import { formatCurrency, formatNumber, cn } from "@/lib/utils"
+import { SidebarMediumAd } from "@/components/ads/ad-slot"
 
 // Mock data - in production this would come from APIs
 const trendingTickers = [
@@ -311,16 +312,21 @@ export function TrendingSidebar() {
       </Card>
 
       {/* Ad Slot */}
-      <Card className="border-dashed">
-        <CardContent className="flex items-center justify-center p-6">
-          <div className="text-center space-y-2">
-            <div className="text-sm text-muted-foreground">Advertisement</div>
-            <div className="text-xs text-muted-foreground">
-              300x250 Ad Unit
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <SidebarMediumAd 
+        targeting={{ position: "sidebar", section: "trending" }}
+        fallbackContent={
+          <Card className="border-dashed">
+            <CardContent className="flex items-center justify-center p-6">
+              <div className="text-center space-y-2">
+                <div className="text-sm text-muted-foreground">Premium Content</div>
+                <div className="text-xs text-muted-foreground">
+                  Upgrade to remove ads
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        }
+      />
 
       {/* Upgrade CTA */}
       <Card className="bg-gradient-to-br from-bullish-50 to-bullish-100 dark:from-bullish-950 dark:to-bullish-900 border-bullish-200 dark:border-bullish-800">

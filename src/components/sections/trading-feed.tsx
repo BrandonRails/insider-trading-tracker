@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select"
 import { RefreshCw, Filter, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { FeedInlineAd } from "@/components/ads/ad-slot"
 
 // Mock data - in production this would come from the API
 const mockTransactions: TransactionData[] = [
@@ -263,12 +264,23 @@ export function TradingFeed({ className }: TradingFeedProps) {
       {/* Transaction List */}
       <div className="space-y-4">
         {filteredTransactions.length > 0 ? (
-          filteredTransactions.map((transaction) => (
-            <TransactionCard
-              key={transaction.id}
-              transaction={transaction}
-              showPerformance={true}
-            />
+          filteredTransactions.map((transaction, index) => (
+            <React.Fragment key={transaction.id}>
+              <TransactionCard
+                transaction={transaction}
+                showPerformance={true}
+              />
+              {/* Insert ad every 3 transactions for free users */}
+              {(index + 1) % 3 === 0 && (
+                <FeedInlineAd 
+                  index={Math.floor((index + 1) / 3)}
+                  targeting={{ 
+                    position: "feed-inline", 
+                    transaction_index: index + 1 
+                  }}
+                />
+              )}
+            </React.Fragment>
           ))
         ) : (
           <div className="text-center py-12">

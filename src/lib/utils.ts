@@ -22,11 +22,13 @@ export function formatCurrency(
   
   const { compact = false, showSign = false, currency = "USD" } = options
   
+  // Use consistent formatting to prevent hydration mismatches
   const formatter = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
     notation: compact ? "compact" : "standard",
-    maximumFractionDigits: compact ? 1 : 2,
+    maximumFractionDigits: compact ? 0 : 2, // Use 0 for compact to avoid decimal inconsistencies
+    minimumFractionDigits: compact ? 0 : 2,
   })
   
   const formatted = formatter.format(Math.abs(amount))

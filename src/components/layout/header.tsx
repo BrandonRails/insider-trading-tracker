@@ -259,7 +259,7 @@ export function Header() {
                   variant="ghost" 
                   className="w-full justify-start"
                   onClick={() => {
-                    signIn()
+                    /* signIn() */
                     setMobileMenuOpen(false)
                   }}
                 >
@@ -268,7 +268,7 @@ export function Header() {
                 <Button 
                   className="w-full"
                   onClick={() => {
-                    signIn()
+                    /* signIn() */
                     setMobileMenuOpen(false)
                   }}
                 >

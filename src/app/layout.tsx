@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { ConsentBanner } from "@/components/ads/consent-banner";
 // import { AuthSessionProvider } from "@/components/providers/session-provider";
 
 const geistSans = Geist({
@@ -55,6 +56,7 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          <ConsentBanner />
         </div>
       </body>
     </html>
