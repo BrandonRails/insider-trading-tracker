@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Header } from "@/components/layout/header";
+import { Footer } from "@/components/layout/footer";
+// import { AuthSessionProvider } from "@/components/providers/session-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,19 +16,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Insider Pulse - Track Insider & Politician Trades in Real Time",
+  title: "Insider Pilot - Track Insider & Politician Trades in Real Time",
   description: "Stay ahead of the market with actionable insights from insider and politician trades. Real-time SEC filings and financial disclosures.",
   keywords: "insider trading, politician trades, SEC filings, congress trades, stock trades, financial analytics, market insights",
-  authors: [{ name: "Insider Pulse Team" }],
+  authors: [{ name: "Insider Pilot Team" }],
   openGraph: {
-    title: "Insider Pulse - Track Insider & Politician Trades in Real Time",
+    title: "Insider Pilot - Track Insider & Politician Trades in Real Time",
     description: "Stay ahead of the market with actionable insights from insider and politician trades",
     type: "website",
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Insider Pulse - Track Insider & Politician Trades in Real Time",
+    title: "Insider Pilot - Track Insider & Politician Trades in Real Time",
     description: "Stay ahead of the market with actionable insights from insider and politician trades",
   },
   robots: "index, follow",
@@ -46,7 +49,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1">
+            {children}
+          </main>
+          <Footer />
+        </div>
       </body>
     </html>
   );

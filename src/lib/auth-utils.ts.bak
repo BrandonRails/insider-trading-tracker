@@ -1,0 +1,346 @@
+/**
+ * Authentication Utilities - Security helpers and user management
+ */
+
+import { prisma } from "@/lib/prisma"
+import { headers } from "next/headers"
+import { auth } from "@/lib/auth"
+
+// User management utilities
+
+export async function getUserByEmail(email: string) {
+  try {
+    return await prisma.user.findUnique({
+      where: { email },
+      include: {
+        accounts: true,
+        sessions: true,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching user by email:", error);
+    return null;
+  }
+}
+
+export async function getUserById(id: string) {
+  try {
+    return await prisma.user.findUnique({
+      where: { id },
+    });
+  } catch (error) {
+    console.error("Error fetching user by ID:", error);
+    return null;
+  }
+}
+
+// Audit logging
+
+interface AuditLogParams {
+  userId?: string;
+  action: string;
+  entity: string;
+  entityId?: string;
+  metadata?: Record<string, any>;
+}
+
+export async function createAuditLog({
+  userId,
+  action,
+  entity,
+  entityId,
+  metadata = {},
+}: AuditLogParams) {
+  try {
+    const headersList = headers();
+    const ipAddress = headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || "unknown";
+    const userAgent = headersList.get("user-agent") || "unknown";
+    
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action,
+        entity,
+        entityId,
+        metadata,
+        ipAddress,
+        userAgent,
+      },
+    });
+  } catch (error) {
+    console.error("Error creating audit log:", error);
+    // Don't throw - audit logging shouldn't break main flow
+  }
+}
+
+// Session utilities
+
+export async function getCurrentUser() {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user?.id) {
+    return null;
+  }
+  
+  return await getUserById(session.user.id);
+}
+
+export async function requireAuth() {
+  const user = await getCurrentUser();
+  
+  if (!user) {
+    throw new Error("Authentication required");
+  }
+  
+  return user;
+}
+
+export async function requireAdmin() {
+  const user = await requireAuth();
+  
+  if (user.role !== "ADMIN") {
+    throw new Error("Admin access required");
+  }
+  
+  return user;
+}
+
+export async function requirePaidPlan() {
+  const user = await requireAuth();
+  
+  if (user.plan !== "PAID") {
+    throw new Error("Paid plan required");
+  }
+  
+  return user;
+}
+
+// Security utilities
+
+export async function incrementFailedLogin(userId: string) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { failedLoginCount: true },
+    });
+    
+    if (!user) return;
+    
+    const newCount = user.failedLoginCount + 1;
+    const shouldLock = newCount >= 5; // Lock after 5 failed attempts
+    
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        failedLoginCount: newCount,
+        ...(shouldLock && {
+          lockedUntil: new Date(Date.now() + 30 * 60 * 1000), // Lock for 30 minutes
+        }),
+      },
+    });
+    
+    if (shouldLock) {
+      await createAuditLog({
+        userId,
+        action: "ACCOUNT_LOCKED",
+        entity: "user",
+        entityId: userId,
+        metadata: { reason: "Multiple failed login attempts" },
+      });
+    }
+  } catch (error) {
+    console.error("Error incrementing failed login count:", error);
+  }
+}
+
+export async function resetFailedLoginCount(userId: string) {
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        failedLoginCount: 0,
+        lockedUntil: null,
+      },
+    });
+  } catch (error) {
+    console.error("Error resetting failed login count:", error);
+  }
+}
+
+// Geographic region detection (for GDPR/CCPA compliance)
+
+export function detectUserRegion(headersList: Headers) {
+  const country = headersList.get("cf-ipcountry") || // Cloudflare
+                  headersList.get("x-vercel-ip-country") || // Vercel
+                  headersList.get("x-country-code") || // Generic
+                  "US"; // Default
+  
+  const state = headersList.get("cf-region") || // Cloudflare
+                headersList.get("x-vercel-ip-country-region") || // Vercel
+                headersList.get("x-state-code"); // Generic
+  
+  // GDPR regions (EU/EEA/UK/CH)
+  const gdprCountries = [
+    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
+    "DE", "GR", "HU", "IS", "IE", "IT", "LV", "LI", "LT", "LU",
+    "MT", "NL", "NO", "PL", "PT", "RO", "SK", "SI", "ES", "SE",
+    "GB", "CH"
+  ];
+  
+  return {
+    gdprRegion: gdprCountries.includes(country),
+    ccpaRegion: country === "US" && state === "CA",
+    country,
+    state,
+  };
+}
+
+// Rate limiting helpers
+
+export async function checkRateLimit(
+  identifier: string,
+  windowMs: number = 15 * 60 * 1000, // 15 minutes
+  maxRequests: number = 100
+): Promise<{ allowed: boolean; remaining: number; reset: number }> {
+  // This would integrate with Redis or Upstash for production
+  // For now, return a simple implementation
+  
+  const key = `ratelimit:${identifier}`;
+  const now = Date.now();
+  const window = Math.floor(now / windowMs);
+  
+  // In production, use Redis with sliding window
+  // This is a simplified version
+  
+  return {
+    allowed: true,
+    remaining: maxRequests - 1,
+    reset: (window + 1) * windowMs,
+  };
+}
+
+// Subscription helpers
+
+export async function checkUserSubscription(userId: string) {
+  const user = await getUserById(userId);
+  
+  if (!user) return { hasAccess: false, plan: "FREE" };
+  
+  // Check if paid plan is still active
+  if (user.plan === "PAID" && user.planExpiresAt) {
+    const isExpired = new Date() > user.planExpiresAt;
+    
+    if (isExpired) {
+      // Downgrade to free plan
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          plan: "FREE",
+          planExpiresAt: null,
+        },
+      });
+      
+      return { hasAccess: false, plan: "FREE" };
+    }
+  }
+  
+  return {
+    hasAccess: user.plan === "PAID",
+    plan: user.plan,
+    expiresAt: user.planExpiresAt,
+  };
+}
+
+// Data export utilities (for GDPR compliance)
+
+export async function exportUserData(userId: string) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        accounts: {
+          select: {
+            provider: true,
+            createdAt: true,
+          },
+        },
+        watchlists: {
+          include: {
+            items: {
+              include: {
+                person: {
+                  select: { name: true },
+                },
+                company: {
+                  select: { name: true, ticker: true },
+                },
+              },
+            },
+          },
+        },
+        alertSubscriptions: {
+          select: {
+            ruleJson: true,
+            channel: true,
+            enabled: true,
+            createdAt: true,
+          },
+        },
+        auditLogs: {
+          select: {
+            action: true,
+            entity: true,
+            createdAt: true,
+            ipAddress: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 100, // Last 100 actions
+        },
+      },
+    });
+    
+    if (!user) throw new Error("User not found");
+    
+    // Remove sensitive data
+    const exportData = {
+      ...user,
+      accounts: user.accounts,
+      watchlists: user.watchlists,
+      alertSubscriptions: user.alertSubscriptions,
+      auditLogs: user.auditLogs,
+    };
+    
+    // Remove internal IDs and sensitive fields
+    delete (exportData as any).stripeCustomerId;
+    delete (exportData as any).failedLoginCount;
+    delete (exportData as any).lockedUntil;
+    
+    return exportData;
+  } catch (error) {
+    console.error("Error exporting user data:", error);
+    throw error;
+  }
+}
+
+// Account deletion (for GDPR compliance)
+
+export async function deleteUserAccount(userId: string) {
+  try {
+    // This will cascade delete related records due to Prisma schema
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+    
+    await createAuditLog({
+      action: "ACCOUNT_DELETED",
+      entity: "user",
+      entityId: userId,
+      metadata: { reason: "User requested deletion" },
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error deleting user account:", error);
+    throw error;
+  }
+}
