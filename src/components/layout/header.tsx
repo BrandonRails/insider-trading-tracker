@@ -206,7 +206,7 @@ export function Header() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-red-600 focus:text-red-600"
-                  onClick={() => {}} // signOut()}
+                  onClick={() => {/* signOut() */}}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign out
@@ -215,10 +215,10 @@ export function Header() {
             </DropdownMenu>
           ) : (
             <div className="hidden sm:flex items-center gap-2">
-              <Button variant="ghost" onClick={() => {}} // signIn()}>
+              <Button variant="ghost" onClick={() => {/* signIn() */}}>
                 Sign in
               </Button>
-              <Button onClick={() => {}} // signIn()}>
+              <Button onClick={() => {/* signIn() */}}>
                 Get Started
               </Button>
             </div>
